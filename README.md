@@ -1,3 +1,166 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+/**
+ * @title Simple Blogging Platform
+ * @dev A minimal blogging smart contract with posts, authors, likes, and comments
+ */
+contract SimpleBlog {
+    
+    // Struct to represent a blog post
+    struct BlogPost {
+        uint256 id;
+        address author;
+        string title;
+        string content;
+        uint256 timestamp;
+        uint256 likes;
+        bool isPublished;
+    }
+    
+    // Struct to represent a blog author
+    struct Author {
+        address authorAddress;
+        string username;
+        string bio;
+        uint256 totalPosts;
+        uint256 totalLikes;
+        uint256 joinDate;
+    }
+    
+    // Struct for comments
+    struct Comment {
+        uint256 id;
+        uint256 postId;
+        address commenter;
+        string content;
+        uint256 timestamp;
+    }
+    
+    // State variables
+    mapping(uint256 => BlogPost) public blogPosts;
+    mapping(address => Author) public authors;
+    mapping(uint256 => Comment[]) public postComments;
+    mapping(address => uint256[]) public authorPosts;
+    mapping(uint256 => mapping(address => bool)) public postLikes;
+    
+    uint256 public totalPosts;
+    uint256 public totalComments;
+    
+    // Events
+    event PostCreated(uint256 indexed postId, address indexed author, string title);
+    event PostLiked(uint256 indexed postId, address indexed liker);
+    event CommentAdded(uint256 indexed postId, uint256 indexed commentId, address indexed commenter);
+    event AuthorRegistered(address indexed author, string username);
+    
+    // Modifiers
+    modifier postExists(uint256 _postId) {
+        require(_postId < totalPosts, "Post does not exist");
+        _;
+    }
+    
+    modifier isRegisteredAuthor() {
+        require(bytes(authors[msg.sender].username).length > 0, "Author must be registered");
+        _;
+    }
+    
+    constructor() {
+        totalPosts = 0;
+        totalComments = 0;
+    }
+    
+    /**
+     * @dev Register as an author
+     */
+    function registerAuthor(string memory _username, string memory _bio) external {
+        require(bytes(authors[msg.sender].username).length == 0, "Already registered");
+        require(bytes(_username).length > 0, "Username required");
+        
+        authors[msg.sender] = Author({
+            authorAddress: msg.sender,
+            username: _username,
+            bio: _bio,
+            totalPosts: 0,
+            totalLikes: 0,
+            joinDate: block.timestamp
+        });
+        
+        emit AuthorRegistered(msg.sender, _username);
+    }
+    
+    /**
+     * @dev Create and publish blog posts
+     */
+    function createBlogPost(string memory _title, string memory _content) external isRegisteredAuthor {
+        require(bytes(_title).length > 0, "Title required");
+        require(bytes(_content).length > 0, "Content required");
+        
+        uint256 postId = totalPosts;
+        
+        blogPosts[postId] = BlogPost({
+            id: postId,
+            author: msg.sender,
+            title: _title,
+            content: _content,
+            timestamp: block.timestamp,
+            likes: 0,
+            isPublished: true
+        });
+        
+        authorPosts[msg.sender].push(postId);
+        authors[msg.sender].totalPosts++;
+        totalPosts++;
+        
+        emit PostCreated(postId, msg.sender, _title);
+    }
+    
+    /**
+     * @dev Like a blog post
+     */
+    function likePost(uint256 _postId) external postExists(_postId) isRegisteredAuthor {
+        require(!postLikes[_postId][msg.sender], "Already liked");
+        
+        postLikes[_postId][msg.sender] = true;
+        blogPosts[_postId].likes++;
+        authors[blogPosts[_postId].author].totalLikes++;
+        
+        emit PostLiked(_postId, msg.sender);
+    }
+    
+    /**
+     * @dev Comment on a post
+     */
+    function addComment(uint256 _postId, string memory _content) external postExists(_postId) isRegisteredAuthor {
+        require(bytes(_content).length > 0, "Comment required");
+        
+        Comment memory newComment = Comment({
+            id: totalComments,
+            postId: _postId,
+            commenter: msg.sender,
+            content: _content,
+            timestamp: block.timestamp
+        });
+        
+        postComments[_postId].push(newComment);
+        totalComments++;
+        
+        emit CommentAdded(_postId, totalComments - 1, msg.sender);
+    }
+    
+    /**
+     * @dev Get posts by author
+     */
+    function getAuthorPosts(address _author) external view returns (uint256[] memory) {
+        return authorPosts[_author];
+    }
+    
+    /**
+     * @dev Get comments for a post
+     */
+    function getPostComments(uint256 _postId) external view postExists(_postId) returns (Comment[] memory) {
+        return postComments[_postId];
+    }
+}
 # People's Blogs
 
 ## Project Description
